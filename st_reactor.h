@@ -4,6 +4,7 @@
 #define OS_EX4_ST_REACTOR_H
 
 #include "stdbool.h"
+#include <pthread.h>
 
 typedef void (*handler_t) (int);
 
@@ -17,6 +18,7 @@ typedef struct {
 typedef struct {
     p_fd* file_descriptors; // Array of file descriptors.
     int size; // Number of file descriptors.
+    pthread_t thread_id; // Hold the reactor's thread id.
     bool is_alive; // Is the reactor thread alive.
 } Reactor, *P_Reactor;
 
