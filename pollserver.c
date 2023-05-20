@@ -11,7 +11,7 @@
 #include <netdb.h>
 #include <poll.h>
 
-#define PORT "9034"   // Port we're listening on
+#define PORT "9035"   // Port we're listening on
 
 // Get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)

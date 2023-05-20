@@ -2,6 +2,7 @@
 
 #include "st_reactor.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 void* runServer (void* this);
 
@@ -18,7 +19,7 @@ void* createReactor () {
     // Allocate memory (initialize values).
     reac -> size = 0;
     reac -> is_alive = false;
-    reac -> thread_id = NULL;
+    reac -> thread_id = 0;
     reac -> file_descriptors = (p_fd*) calloc (sizeof (fd), 1);
     // If calloc failed, exit.
     if (!reac -> file_descriptors) {
@@ -44,7 +45,7 @@ void stopReactor (void* this) {
         // Set alive status to false;
         reac -> is_alive = false;
 
-        printf("(+) Stopped reactor.\n")
+        printf("(+) Stopped reactor.\n");
     }
 }
 
@@ -75,7 +76,32 @@ void startReactor (void* this) {
  *
  */
 void addFd (void* this, int fd, handler_t handler) {
+    P_Reactor reac = (P_Reactor)this;
 
+    // Allocate memory for a new file descriptor.
+    p_fd new_fd = (p_fd)calloc(sizeof(fd), 1);
+    if (!new_fd) {
+        printf("(-) Failed allocating memory for a new fd.\n");
+        return;
+    }
+
+    // Set the fd and event handler to the fd pointer.
+    new_fd->file_descriptor = fd;
+    new_fd->event_handler = handler;
+
+    // Reallocate memory for the file descriptors array.
+    p_fd* new_fds = (p_fd*)realloc(reac->file_descriptors, (reac->size + 1) * sizeof(p_fd));
+    if (!new_fds) {
+        printf("(-) Failed allocating memory for the fd array.\n");
+        free(new_fd);
+        return;
+    }
+
+    // Update the reac.
+    reac->file_descriptors = new_fds;
+    reac->file_descriptors[reac->size] = new_fd;
+    reac->size++;
+    
 }
 
 /**
@@ -92,6 +118,5 @@ void WaitFor (void* this) {
 }
 
 void* runServer (void* this) {
-    P_Reactor reac = (P_Reactor) this;
-
+    return this;
 }
