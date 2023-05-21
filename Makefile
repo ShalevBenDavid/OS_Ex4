@@ -10,12 +10,12 @@ all: pollserver st_reactor react_server
 #Creating Programs (tools)
 pollserver: pollserver.c
 	$(CC) $(FLAGS) pollserver.c -o pollserver
-react_server: react_server.c
-	$(CC) $(FLAGS) react_server.c -o react_server
+react_server: react_server.cpp
+	$(CC) $(FLAGS) react_server.cpp -o react_server
 
 #Creating Shared Library
-st_reactor: st_reactor.c st_reactor.h
-	$(CC) $(FLAGS) -o st_reactor.so $(SH) $(FPIC) st_reactor.c
+st_reactor: st_reactor.cpp st_reactor.hpp
+	$(CC) $(FLAGS) -o st_reactor.so $(SH) $(FPIC) st_reactor.cpp
 
 clean:
 	rm -f *.so pollserver st_reactor react_server
