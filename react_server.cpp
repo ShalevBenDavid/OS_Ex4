@@ -2,14 +2,19 @@
 
 #include "st_reactor.hpp"
 #include <signal.h>
+using namespace std;
 
 P_Reactor reactor; // Global reactor.
 
 // Signal handler function to clean up.
 void signalHandler(int signal_num) {
-    printf("(*) Cleaning up...\n");
+    cout << "(*) Cleaning up..." << endl;
     // Stop the reactor.
     stopReactor(reactor);
+    //  Delete allocations.
+    wipe(reactor);
+
+    cout << "(*) Exiting." << endl;
     // Exit the program
     exit(signal_num);
 }
