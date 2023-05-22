@@ -203,7 +203,7 @@ void handle_recv (void* obj, int fd) {
 
     // Receive message from client.
     int received_bytes = recv(fd, buf, DATA_LEN, 0);
-    buf[received_bytes - 2] = '\0';
+    buf[received_bytes] = '\0';
 
     // Got error or connection closed by client.
     if (received_bytes <= 0) {
@@ -219,13 +219,6 @@ void handle_recv (void* obj, int fd) {
     }
     // We got data from the client.
     else {
-        // If client request to quit, close everything.
-        if (!strcmp(buf, "quit")) {
-            wipe(reac);
-            keep_alive = false;
-            cout << "(+) Stopped reactor." << endl;
-            return;
-        }
         // Iterate over clients.
         for (size_t j = 1; j < reac -> file_descriptors.size(); j++) {
             int dest_fd = reac -> file_descriptors.at(j) -> file_descriptor;

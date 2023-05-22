@@ -1,4 +1,4 @@
-In this readme.txt we will explain how to run this excercise.
+In this readme.txt we will explain how to run this exercise.
 
 Instructions:
 First of all, run the command "make" or "make all" in the terminal to generate all executable files.
@@ -10,10 +10,11 @@ Running:
 Please run first the server by entering the command: "./react_server".
 For each client you wish to connect to the server, open a new terminal window and run the command: "telnet 127.0.0.1 9034".
 If you wish to disconnect a specific client, shut down his terminal window.
-If you wish to close the server, press ctrl+z or ctrl+c in the server window or send "quit" message by one of the clients.
+If you wish to close the server, press ctrl+z or ctrl+c in the server window.
 
+* Don't run with "nc" command
 * Our server runs on port 9034 (same as beej's server).
-* You may run with valgrind since all allocation were freed.
+* You may run with valgrind since all allocation were freed (unconditional jump may appear).
 
 
 Questions we have asked ChatGPT:
