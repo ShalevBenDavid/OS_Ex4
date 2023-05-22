@@ -3,6 +3,8 @@
 #include "st_reactor.hpp"
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
+using namespace std;
 
 void* runServer (void* obj);
 
@@ -35,14 +37,13 @@ void stopReactor (void* obj) {
         //Sending cancel request to thread.
         pthread_cancel(reac -> thread_id);
         // Wait for the thread to terminate.
-        pthread_join(reac -> thread_id, NULL);
+        WaitFor(reac);
         // Set alive status to false;
         reac -> is_alive = false;
-        /////////////////
-        ////////////////
-        ///////////////
+        // Deleting all locations.
+        wipe(reac);
 
-        printf("(+) Stopped reactor.\n");
+        cout << "(+) Stopped reactor." << endl;
     }
 }
 
@@ -55,17 +56,17 @@ void startReactor (void* obj) {
 
     // If reactor already running, return.
     if (reac -> is_alive) {
-        printf("(-) Reactor already running!\n");
+        cout << "(-) Reactor already running!" << endl;
         return;
     }
     // Begin single thread.
     int result = pthread_create(&reac -> thread_id, NULL, runServer, reac);
     // If running thread failed, exit.
     if (result) {
-        printf("(-) Creating thread failed!\n");
+        cout << "(-) Creating thread failed!" << endl;
         return;
     } else {
-        printf("(+) Started reactor successfully.\n");
+        cout << "(+) Started reactor successfully." << endl;
     }
     // Set alive status to true;
     reac -> is_alive = true;
@@ -74,7 +75,10 @@ void startReactor (void* obj) {
 }
 
 /**
- *
+ * Add a file descriptor to the reactor.
+ * @param obj - A pointer to the reactor.
+ * @param fd - The file descriptor we want to add.
+ * @param handler - The function we match to this file descriptor.
  */
 void addFd (void* obj, int fd, handler_t handler) {
     P_Reactor reac = (P_Reactor) obj;
@@ -87,9 +91,9 @@ void addFd (void* obj, int fd, handler_t handler) {
     new_fd -> event_handler = handler;
 
     // Create the poll struct for this fd.
-    struct pollfd *pfd = new pollfd();
-    pfd -> fd = fd;
-    pfd -> events = POLLIN; // Report ready to read on incoming connection
+    struct pollfd pfd;
+    pfd.fd = fd;
+    pfd.events = POLLIN; // Report ready to read on incoming connection
 
     // Update the reactor (insert fd and poll).
     reac -> file_descriptors.push_back(new_fd);
@@ -110,7 +114,6 @@ void deleteFD (void* obj, int fd) {
         for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
             if (reac -> file_descriptors.at(i) -> file_descriptor == fd) {
                 delete reac -> file_descriptors.at(i);
-                delete reac -> poll_fds.at(i);
                 reac -> file_descriptors.erase(reac -> file_descriptors.begin() + i);
                 reac -> poll_fds.erase(reac -> poll_fds.begin() + i);
             }
@@ -127,7 +130,7 @@ void WaitFor (void* obj) {
 
     // Check first that the reactor's thread is alive.
     if (reac -> is_alive) {
-        printf("(*) Waiting for thread...\n");
+        cout << "(*) Waiting for thread..." << endl;
         // Wait for the reactor's thread to finish.
         pthread_join(reac -> thread_id, NULL);
     }
@@ -182,7 +185,7 @@ int get_listener_socket () {
         return -1;
     }
     // Listen
-    if (listen(listener, 100) == -1) {
+    if (listen(listener, 5) == -1) {
         return -1;
     }
     return listener;
@@ -198,12 +201,14 @@ void handle_recv (void* obj, int fd) {
 
     // Receive message from client.
     int received_bytes = recv(fd, buf, DATA_LEN, 0);
+    buf[received_bytes - 2] = '\0';
+
     // Got error or connection closed by client.
     if (received_bytes <= 0) {
         if (received_bytes == 0) {
-            printf("(-) Socket %d hung up!\n", fd);
+            cout << "(-) Socket " << fd << " hung up!" << endl;
         } else {
-            printf("(-) Failed to recieve messgae on socket %d.\n", fd);
+            cout << "(-) Failed to receive message on socket " << fd << "." << endl;
         }
 
         // Either way, we'll close the connection and remove client.
@@ -216,14 +221,15 @@ void handle_recv (void* obj, int fd) {
         if (!strcmp(buf, "quit")) {
             wipe(reac);
             keep_alive = false;
+            return;
         }
-        for (size_t j = 0; j < reac -> file_descriptors.size(); j++) {
+        // Iterate over clients.
+        for (size_t j = 1; j < reac -> file_descriptors.size(); j++) {
             int dest_fd = reac -> file_descriptors.at(j) -> file_descriptor;
-
             // Send to everyone except the listener and the sender.
             if (dest_fd != fd) {
                 if (send(dest_fd, buf, received_bytes, 0) == -1) {
-                    printf("(-) Error sending message.\n");
+                    cout << "(-) Error sending message." << endl;
                 }
             }
         }
@@ -244,16 +250,14 @@ void handle_new_connection (void* obj, int fd) {
     // Newly accepted socket descriptor.
     int new_fd = accept(fd, (struct sockaddr *)&remote_addr, &addr_len);
     if (new_fd == -1) {
-        printf("(-) Failed to accept new client.\n");
+        cout << "(-) Failed to accept new client." << endl;
         return;
     }
 
     // Add socket descriptor to reactor.
     addFd(obj, new_fd, handle_recv);
-    printf("(=) New connection from %s on socket %d.\n",
-           inet_ntop(remote_addr.ss_family, get_in_addr((struct sockaddr*)& remote_addr),
-                   remoteIP, INET6_ADDRSTRLEN), new_fd);
-
+    cout << "(=) New connection from " << inet_ntop(remote_addr.ss_family, get_in_addr((struct sockaddr*)&remote_addr),
+            remoteIP, INET6_ADDRSTRLEN) << " on socket " << new_fd << "." << endl;
 }
 
 /**
@@ -273,13 +277,20 @@ void* runServer (void* obj) {
     addFd(reac, listener, handle_new_connection);
 
     while (keep_alive) {
+        int numEvents = poll(reac -> poll_fds.data(), reac -> poll_fds.size(), -1);
+        if (numEvents == -1) {
+            cout << "(-) Poll() failed.\n";
+            keep_alive = false;
+        }
+
         // Run through the existing connections looking for data to read
         for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
             // Check if someone's ready to read
-            if (reac -> poll_fds.at(i) -> revents & POLLIN) {
+            if (reac -> poll_fds.at(i).revents & POLLIN) {
                 // Call appropriate function (new connection/recv).
                 reac -> file_descriptors.at(i) ->
                     event_handler(reac, reac -> file_descriptors.at(i) -> file_descriptor);
+                if (!keep_alive) {break;}
             }
         }
     }
@@ -292,14 +303,11 @@ void* runServer (void* obj) {
  */
 void wipe (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
+    cout << "(*) Wiping reactor." << endl;
 
     // Clear file_descriptors.
     for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
         delete reac -> file_descriptors.at(i);
-    }
-    // Clear poll_fds.
-    for (size_t i = 0; i < reac -> poll_fds.size(); i++) {
-        delete reac -> poll_fds.at(i);
     }
     // Delete reactor.
     delete reac;

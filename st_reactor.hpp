@@ -31,7 +31,7 @@ typedef struct {
 // Struct to hold the reactor info.
 typedef struct R {
     std :: vector <P_FD> file_descriptors; // Vector of file descriptors.
-    std :: vector <pollfd*> poll_fds; // Vector of poll for file descriptors.
+    std :: vector <pollfd> poll_fds; // Vector of poll for file descriptors.
     pthread_t thread_id; // Hold the reactor's thread id.
     bool is_alive; // Is the reactor thread alive.
 } Reactor, *P_Reactor;

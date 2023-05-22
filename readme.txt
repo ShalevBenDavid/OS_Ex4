@@ -1,5 +1,23 @@
+In this readme.txt we will explain how to run this excercise.
+
+Instructions:
+First of all, run the command "make" or "make all" in the terminal to generate all executable files.
+In order to clean the files, run the command "make clean".
+Since we compile the shared library "st_reactor.so" in the makefile,
+please before running the program run the command: "export LD_LIBRARY_PATH=."
+
+Running:
+Please run first the server by entering the command: "./react_server".
+For each client you wish to connect to the server, open a new terminal window and run the command: "telnet 127.0.0.1 9034".
+If you wish to disconnect a specific client, shut down his terminal window.
+If you wish to close the server, press ctrl+z or ctrl+c in the server window or send "quit" message by one of the clients.
+
+* Our server runs on port 9034 (same as beej's server).
+* You may run with valgrind since all allocation were freed.
+
+
 Questions we have asked ChatGPT:
 -> "how can you cancel a thread?"
 -> "what pthread_t holds?"
 -> "how to close sockets and free space when force exiting program in c (ctrl+c or ctrl+z)?"
--> "how to delete a specific item from a vector?"
+-> "how to delete a specific item from a vector?
