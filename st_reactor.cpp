@@ -7,6 +7,7 @@
 void* runServer (void* obj);
 
 char buf[DATA_LEN]; // Global buffer to hold data from clients.
+bool keep_alive = true; // Global bool to know when to stopn loop.
 
 /**
  * Creates a reactor.
@@ -16,8 +17,8 @@ void* createReactor () {
     P_Reactor reac = new Reactor();
 
     // Initialize values.
-    reac -> is_alive = true;
-    reac ->thread_id = 0;
+    reac -> is_alive = false;
+    reac -> thread_id = 0;
     // Return pointer to the reactor.
     return reac;
 }
@@ -106,7 +107,7 @@ void deleteFD (void* obj, int fd) {
     // Only if alive.
     if (reac -> is_alive) {
         // Locate and delete file descriptors.
-        for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+        for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
             if (reac -> file_descriptors.at(i) -> file_descriptor == fd) {
                 delete reac -> file_descriptors.at(i);
                 delete reac -> poll_fds.at(i);
@@ -214,9 +215,9 @@ void handle_recv (void* obj, int fd) {
         // If client request to quit, close everything.
         if (!strcmp(buf, "quit")) {
             wipe(reac);
-            exit(EXIT_SUCCESS);
+            keep_alive = false;
         }
-        for (int j = 0; j < reac -> file_descriptors.size(); j++) {
+        for (size_t j = 0; j < reac -> file_descriptors.size(); j++) {
             int dest_fd = reac -> file_descriptors.at(j) -> file_descriptor;
 
             // Send to everyone except the listener and the sender.
@@ -271,9 +272,9 @@ void* runServer (void* obj) {
     // Add the listener to set
     addFd(reac, listener, handle_new_connection);
 
-    while (true) {
+    while (keep_alive) {
         // Run through the existing connections looking for data to read
-        for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+        for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
             // Check if someone's ready to read
             if (reac -> poll_fds.at(i) -> revents & POLLIN) {
                 // Call appropriate function (new connection/recv).
@@ -293,11 +294,13 @@ void wipe (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
 
     // Clear file_descriptors.
-    for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+    for (size_t i = 0; i < reac -> file_descriptors.size(); i++) {
         delete reac -> file_descriptors.at(i);
     }
     // Clear poll_fds.
-    for (int i = 0; i < reac -> poll_fds.size(); i++) {
+    for (size_t i = 0; i < reac -> poll_fds.size(); i++) {
         delete reac -> poll_fds.at(i);
     }
+    // Delete reactor.
+    delete reac;
 }

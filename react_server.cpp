@@ -3,8 +3,10 @@
 #include "st_reactor.hpp"
 #include <signal.h>
 
+P_Reactor reactor; // Global reactor.
+
 // Signal handler function to clean up.
-void signalHandler(int signal_num, P_Reactor reactor) {
+void signalHandler(int signal_num) {
     printf("(*) Cleaning up...\n");
     // Stop the reactor.
     stopReactor(reactor);
@@ -14,9 +16,9 @@ void signalHandler(int signal_num, P_Reactor reactor) {
 
 int main() {
     // Create our reactor.
-    P_Reactor reactor = createReactor();
+    reactor = (P_Reactor) createReactor();
     // Begin our thread to listen for clients.
-    startReactor (reactor);
+    startReactor(reactor);
     // Register signal handlers for when exiting program.
     signal(SIGINT, signalHandler);   // Ctrl+C
     signal(SIGTSTP, signalHandler);  // Ctrl+Z

@@ -3,7 +3,6 @@
 #ifndef OS_EX4_ST_REACTOR_H
 #define OS_EX4_ST_REACTOR_H
 
-#include "stdbool.h"
 #include <pthread.h>
 #include <vector>
 #include <poll.h>
@@ -18,7 +17,7 @@
 #include <netdb.h>
 #include <signal.h>
 
-#define PORT "9035" // Port we're listening on.
+#define PORT "9034" // Port we're listening on.
 #define DATA_LEN 512 //  The data length we are willing to transfer.
 
 typedef void (*handler_t) (void*, int);
