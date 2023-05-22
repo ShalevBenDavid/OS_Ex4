@@ -258,7 +258,6 @@ void handle_new_connection (void* obj, int fd) {
 
 /**
  * Run busy loop to handle clients.
- * @return
  */
 void* runServer (void* obj) {
     P_Reactor reac = (P_Reactor) obj;

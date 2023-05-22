@@ -5,6 +5,8 @@ First of all, run the command "make" or "make all" in the terminal to generate a
 In order to clean the files, run the command "make clean".
 Since we compile the shared library "st_reactor.so" in the makefile,
 please before running the program run the command: "export LD_LIBRARY_PATH=."
+Same as beej, all message that are sent to the server are transfer to the client
+and only system logs, errors, clients connecting and disconnecting and info as such will be shown in the server.
 
 Running:
 Please run first the server by entering the command: "./react_server".
@@ -15,7 +17,6 @@ If you wish to close the server, press ctrl+z or ctrl+c in the server window.
 * Don't run with "nc" command
 * Our server runs on port 9034 (same as beej's server).
 * You may run with valgrind since all allocation were freed (unconditional jump may appear).
-
 
 Questions we have asked ChatGPT:
 -> "how can you cancel a thread?"
