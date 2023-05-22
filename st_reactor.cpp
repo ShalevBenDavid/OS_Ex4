@@ -6,13 +6,15 @@
 
 void* runServer (void* obj);
 
+char buf[DATA_LEN]; // Global buffer to hold data from clients.
+
 /**
  * Creates a reactor.
  * @return - A pointer to the new allocated reactor.
  */
 void* createReactor () {
-    // Create reactor.
     P_Reactor reac = new Reactor();
+
     // Initialize values.
     reac -> is_alive = true;
     reac ->thread_id = 0;
@@ -22,9 +24,11 @@ void* createReactor () {
 
 /**
  * Stops the reactor if it's running. Else, does nothings.
+ * @param obj - Pointer to the reactor.
  */
 void stopReactor (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
+
     // Check if the reactor is active.
     if (reac -> is_alive) {
         //Sending cancel request to thread.
@@ -33,6 +37,9 @@ void stopReactor (void* obj) {
         pthread_join(reac -> thread_id, NULL);
         // Set alive status to false;
         reac -> is_alive = false;
+        /////////////////
+        ////////////////
+        ///////////////
 
         printf("(+) Stopped reactor.\n");
     }
@@ -40,9 +47,11 @@ void stopReactor (void* obj) {
 
 /**
  * Starts a thread for the reactor. The thread will run in infinite loop with poll.
+ * @param obj - Pointer to the reactor.
  */
 void startReactor (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
+
     // If reactor already running, return.
     if (reac -> is_alive) {
         printf("(-) Reactor already running!\n");
@@ -87,10 +96,34 @@ void addFd (void* obj, int fd, handler_t handler) {
 }
 
 /**
+ * Deletes a file descriptor from reactor, if exist.
+ * @param obj - Pointer to the reactor.
+ * @param fd - The file descriptor we want to remove.
+ */
+void deleteFD (void* obj, int fd) {
+    P_Reactor reac = (P_Reactor) obj;
+
+    // Only if alive.
+    if (reac -> is_alive) {
+        // Locate and delete file descriptors.
+        for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+            if (reac -> file_descriptors.at(i) -> file_descriptor == fd) {
+                delete reac -> file_descriptors.at(i);
+                delete reac -> poll_fds.at(i);
+                reac -> file_descriptors.erase(reac -> file_descriptors.begin() + i);
+                reac -> poll_fds.erase(reac -> poll_fds.begin() + i);
+            }
+        }
+    }
+}
+
+/**
  * Wait on pthread_join(3) until the reactor's thread will end.
+ * @param obj - Pointer to the reactor.
  */
 void WaitFor (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
+
     // Check first that the reactor's thread is alive.
     if (reac -> is_alive) {
         printf("(*) Waiting for thread...\n");
@@ -99,20 +132,23 @@ void WaitFor (void* obj) {
     }
 }
 
-// ---------------------- My Functions -------------------------
+// ----------------------> My Functions <-------------------------
 
-// Get sockaddr, IPv4 or IPv6:
+/**
+ * @param sa -The socket address struct.
+ * @return - A sockaddr (IPv4 or IPv6).
+ */
 void* get_in_addr (struct sockaddr* sa) {
     if (sa -> sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa) -> sin_addr);
+        return &(((struct sockaddr_in*) sa) -> sin_addr);
     }
     return &(((struct sockaddr_in6*) sa) -> sin6_addr);
 }
 
 // Return a listening socket
-int get_listener_socket (void) {
-    int listener;     // Listening socket descriptor
-    int yes = 1;        // For setsockopt() SO_REUSEADDR, below
+int get_listener_socket () {
+    int listener; // Listening socket descriptor
+    int yes = 1;  // For setsockopt() SO_REUSEADDR, below
     int rv;
 
     struct addrinfo hints, *ai, *p;
@@ -145,56 +181,123 @@ int get_listener_socket (void) {
         return -1;
     }
     // Listen
-    if (listen(listener, 10) == -1) {
+    if (listen(listener, 100) == -1) {
         return -1;
     }
     return listener;
 }
 
+/**
+ * Receive message on listener socket from clients.
+ * @param obj - Pointer to the reactor.
+ * @param fd - The client socket on which we receive message.
+ */
 void handle_recv (void* obj, int fd) {
+    P_Reactor reac = (P_Reactor) obj;
 
-}
+    // Receive message from client.
+    int received_bytes = recv(fd, buf, DATA_LEN, 0);
+    // Got error or connection closed by client.
+    if (received_bytes <= 0) {
+        if (received_bytes == 0) {
+            printf("(-) Socket %d hung up!\n", fd);
+        } else {
+            printf("(-) Failed to recieve messgae on socket %d.\n", fd);
+        }
 
-void handle_new_connection (void* obj, int fd) {
-    struct sockaddr_storage remoteaddr;
-    socklen_t addrlen = sizeof(remoteaddr);
-    // Newly accept()ed socket descriptor
-    int newfd = accept(fd, (struct sockaddr *)&remoteaddr, &addrlen);
-
-    if (newfd == -1) {
-        perror("accept");
+        // Either way, we'll close the connection and remove client.
+        close(fd);
+        deleteFD(reac, fd);
     }
+    // We got data from the client.
+    else {
+        // If client request to quit, close everything.
+        if (!strcmp(buf, "quit")) {
+            wipe(reac);
+            exit(EXIT_SUCCESS);
+        }
+        for (int j = 0; j < reac -> file_descriptors.size(); j++) {
+            int dest_fd = reac -> file_descriptors.at(j) -> file_descriptor;
 
-    addFd(obj, newfd, handle_recv);
+            // Send to everyone except the listener and the sender.
+            if (dest_fd != fd) {
+                if (send(dest_fd, buf, received_bytes, 0) == -1) {
+                    printf("(-) Error sending message.\n");
+                }
+            }
+        }
+    }
 }
 
 /**
- *  Run busy loop to handle clients.
+ * Receive a new connection on reactor.
+ * @param obj - Pointer to the reactor.
+ * @param fd - The listener socket on which we get a new connection.
+ */
+void handle_new_connection (void* obj, int fd) {
+    // Client address.
+    struct sockaddr_storage remote_addr;
+    socklen_t addr_len = sizeof(remote_addr);
+    char remoteIP[INET6_ADDRSTRLEN];
+
+    // Newly accepted socket descriptor.
+    int new_fd = accept(fd, (struct sockaddr *)&remote_addr, &addr_len);
+    if (new_fd == -1) {
+        printf("(-) Failed to accept new client.\n");
+        return;
+    }
+
+    // Add socket descriptor to reactor.
+    addFd(obj, new_fd, handle_recv);
+    printf("(=) New connection from %s on socket %d.\n",
+           inet_ntop(remote_addr.ss_family, get_in_addr((struct sockaddr*)& remote_addr),
+                   remoteIP, INET6_ADDRSTRLEN), new_fd);
+
+}
+
+/**
+ * Run busy loop to handle clients.
  * @return
  */
 void* runServer (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
 
-    // Listening socket descriptor
-    int listener;
-    int newfd;
-    // Client address
-    socklen_t addrlen;
-
-    // Buffer for client data.
-    char buf[DATA_LEN];
-
-    char remoteIP[INET6_ADDRSTRLEN];
-
-    // Set up and get a listening socket
-    listener = get_listener_socket();
+    // Set up and get a listening socket descriptor.
+    int listener = get_listener_socket();
     if (listener == -1) {
         fprintf(stderr, "(-) Error in getting listening socket!\n");
         exit(EXIT_FAILURE);
     }
-
     // Add the listener to set
     addFd(reac, listener, handle_new_connection);
 
+    while (true) {
+        // Run through the existing connections looking for data to read
+        for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+            // Check if someone's ready to read
+            if (reac -> poll_fds.at(i) -> revents & POLLIN) {
+                // Call appropriate function (new connection/recv).
+                reac -> file_descriptors.at(i) ->
+                    event_handler(reac, reac -> file_descriptors.at(i) -> file_descriptor);
+            }
+        }
+    }
     return obj;
+}
+
+/**
+ * Wipe allocations for the reactor struct.
+ * @param obj - Pointer to the reactor.
+ */
+void wipe (void* obj) {
+    P_Reactor reac = (P_Reactor) obj;
+
+    // Clear file_descriptors.
+    for (int i = 0; i < reac -> file_descriptors.size(); i++) {
+        delete reac -> file_descriptors.at(i);
+    }
+    // Clear poll_fds.
+    for (int i = 0; i < reac -> poll_fds.size(); i++) {
+        delete reac -> poll_fds.at(i);
+    }
 }

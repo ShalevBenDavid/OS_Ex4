@@ -42,6 +42,8 @@ void stopReactor (void*);
 void startReactor (void*);
 void addFd (void*, int, handler_t);
 void WaitFor (void*);
+void deleteFD (void*, int);
 void* runServer(void*);
+void wipe (void*);
 
 #endif //OS_EX4_ST_REACTOR_H
