@@ -1,9 +1,7 @@
 // Created by Shalev Ben David and Ron Shuster.
 
 #include "st_reactor.hpp"
-#include <stdlib.h>
-#include <stdio.h>
-#include <iostream>
+
 using namespace std;
 
 void* runServer (void* obj);
@@ -36,8 +34,8 @@ void stopReactor (void* obj) {
     if (reac -> is_alive) {
         //Sending cancel request to thread.
         pthread_cancel(reac -> thread_id);
-        // Wait for the thread to terminate.
-        WaitFor(reac);
+        // Wait for the reactor's thread to finish.
+        pthread_join(reac -> thread_id, NULL);
         // Set alive status to false;
         reac -> is_alive = false;
         // Deleting all locations.
@@ -150,7 +148,9 @@ void* get_in_addr (struct sockaddr* sa) {
 }
 
 // Return a listening socket
-int get_listener_socket () {
+int get_listener_socket (void* obj) {
+    P_Reactor reac = (P_Reactor) obj;
+
     int listener; // Listening socket descriptor
     int yes = 1;  // For setsockopt() SO_REUSEADDR, below
     int rv;
@@ -164,7 +164,8 @@ int get_listener_socket () {
     hints.ai_flags = AI_PASSIVE;
     if ((rv = getaddrinfo(NULL, PORT, &hints, &ai))) {
         fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
-        exit(1);
+        wipe(reac);
+        exit(EXIT_FAILURE);
     }
     for(p = ai; p != NULL; p = p -> ai_next) {
         listener = socket(p -> ai_family, p -> ai_socktype, p -> ai_protocol);
@@ -185,7 +186,7 @@ int get_listener_socket () {
         return -1;
     }
     // Listen
-    if (listen(listener, 5) == -1) {
+    if (listen(listener, 10) == -1) {
         return -1;
     }
     return listener;
@@ -206,7 +207,7 @@ void handle_recv (void* obj, int fd) {
     // Got error or connection closed by client.
     if (received_bytes <= 0) {
         if (received_bytes == 0) {
-            cout << "(-) Socket " << fd << " hung up!" << endl;
+            cout << "(=) Socket " << fd << " hung up!" << endl;
         } else {
             cout << "(-) Failed to receive message on socket " << fd << "." << endl;
         }
@@ -221,6 +222,7 @@ void handle_recv (void* obj, int fd) {
         if (!strcmp(buf, "quit")) {
             wipe(reac);
             keep_alive = false;
+            cout << "(+) Stopped reactor." << endl;
             return;
         }
         // Iterate over clients.
@@ -271,7 +273,9 @@ void* runServer (void* obj) {
     int listener = get_listener_socket();
     if (listener == -1) {
         fprintf(stderr, "(-) Error in getting listening socket!\n");
-        exit(EXIT_FAILURE);
+        wipe(reac);
+        cout << "(+) Stopped reactor." << endl;
+        return;
     }
     // Add the listener to set
     addFd(reac, listener, handle_new_connection);
@@ -290,7 +294,7 @@ void* runServer (void* obj) {
                 // Call appropriate function (new connection/recv).
                 reac -> file_descriptors.at(i) ->
                     event_handler(reac, reac -> file_descriptors.at(i) -> file_descriptor);
-                if (!keep_alive) {break;}
+                if (!keep_alive) { break; }
             }
         }
     }

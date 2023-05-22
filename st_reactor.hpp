@@ -7,15 +7,13 @@
 #include <vector>
 #include <poll.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <signal.h>
 
 #define PORT "9034" // Port we're listening on.
 #define DATA_LEN 512 //  The data length we are willing to transfer.

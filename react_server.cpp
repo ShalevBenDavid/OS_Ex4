@@ -8,11 +8,9 @@ P_Reactor reactor; // Global reactor.
 
 // Signal handler function to clean up.
 void signalHandler(int signal_num) {
-    cout << "(*) Cleaning up..." << endl;
+    cout << "\n(*) Cleaning up..." << endl;
     // Stop the reactor.
     stopReactor(reactor);
-    //  Delete allocations.
-    wipe(reactor);
 
     cout << "(*) Exiting." << endl;
     // Exit the program
@@ -28,6 +26,8 @@ int main() {
     reactor = (P_Reactor) createReactor();
     // Begin our thread to listen for clients.
     startReactor(reactor);
+
+    cout << "(*) Exiting." << endl;
 
     return 0;
 }
