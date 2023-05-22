@@ -151,11 +151,12 @@ void* get_in_addr (struct sockaddr* sa) {
 int get_listener_socket (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
 
-    int listener; // Listening socket descriptor
+    int listener = -1; // Listening socket descriptor
     int yes = 1;  // For setsockopt() SO_REUSEADDR, below
-    int rv;
+    int rv = 0;
 
-    struct addrinfo hints, *ai, *p;
+    struct addrinfo hints = {};
+    struct addrinfo *ai, *p = nullptr;
 
     // Get us a socket and bind it
     memset(&hints, 0, sizeof hints);
@@ -245,9 +246,9 @@ void handle_recv (void* obj, int fd) {
  */
 void handle_new_connection (void* obj, int fd) {
     // Client address.
-    struct sockaddr_storage remote_addr;
+    struct sockaddr_storage remote_addr = {};
     socklen_t addr_len = sizeof(remote_addr);
-    char remoteIP[INET6_ADDRSTRLEN];
+    char remoteIP[INET6_ADDRSTRLEN] = {0};
 
     // Newly accepted socket descriptor.
     int new_fd = accept(fd, (struct sockaddr *)&remote_addr, &addr_len);
@@ -270,12 +271,12 @@ void* runServer (void* obj) {
     P_Reactor reac = (P_Reactor) obj;
 
     // Set up and get a listening socket descriptor.
-    int listener = get_listener_socket();
+    int listener = get_listener_socket(reac);
     if (listener == -1) {
         fprintf(stderr, "(-) Error in getting listening socket!\n");
         wipe(reac);
         cout << "(+) Stopped reactor." << endl;
-        return;
+        return obj;
     }
     // Add the listener to set
     addFd(reac, listener, handle_new_connection);
